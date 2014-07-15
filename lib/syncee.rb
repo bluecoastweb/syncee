@@ -58,7 +58,7 @@
 #
 #   end
 
-require 'fileutils'
+require 'fileutils' # mkpath, mv
 require 'io/console' # STDIN.getch
 
 class SyncEE
@@ -115,7 +115,7 @@ class SyncEE
     @site = site
     @debug = debug
 
-    raise RuntimeError, 'site argument is invalid' unless valid_site?
+    raise RuntimeError, "#{SITE_KEYS.join(', ')} are all required" unless valid_site?
 
     sync 'snippets'
     sync 'templates'
@@ -125,7 +125,7 @@ class SyncEE
   private
 
   def valid_site?
-    SITE_KEYS.all?{ |key| !site[key.to_sym].empty? }
+    SITE_KEYS.all?{ |key| !site[key.to_sym].empty? rescue false }
   end
 
   def sync(resource)
@@ -172,7 +172,7 @@ SHELL
     return unless File.directory? site_dir
 
     archive_dir = "#{base_dir}/archive/#{site[:site_name]}"
-    create_dir archive_dir
+    ensure_dir archive_dir
 
     # archive sub-dirs are ascending postive integers
     sub_dir = Dir.entries(archive_dir).sort_by(&:to_i).last.to_i + 1
@@ -182,7 +182,7 @@ SHELL
   end
 
   def write_resource
-    create_dir site_dir
+    ensure_dir site_dir
 
     pattern = RE[resource.to_sym]
 
@@ -240,7 +240,7 @@ SHELL
 
   def write_file(name, contents, template_group, template_type, php_template)
       dir = dir_for template_group
-      ext = file_ext_for template_type, php_template
+      ext = ext_for template_type, php_template
 
       path = "#{dir}/#{name}.#{ext}"
       open(path, 'w') { |f| f.write(contents.join) }
@@ -249,13 +249,13 @@ SHELL
   end
 
   def dir_for(template_group)
-    dir = template_group.length > 0 ? "#{site_dir}/#{template_group}" : site_dir
-    create_dir dir
+    dir = template_group.empty? ? site_dir : "#{site_dir}/#{template_group}"
+    ensure_dir dir
 
     dir
   end
 
-  def file_ext_for(template_type, php_template)
+  def ext_for(template_type, php_template)
     case template_type
     when 'css', 'js', 'xml'
       template_type
@@ -269,7 +269,7 @@ SHELL
     end
   end
 
-  def create_dir(dir)
+  def ensure_dir(dir)
     unless File.directory? dir
       FileUtils.mkpath dir
 
