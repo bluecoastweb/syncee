@@ -163,11 +163,7 @@ SHELL
 
   def archive_existing_resource
     archive_dir = "#{base_dir}/archive/#{site[:site_name]}"
-
-    unless File.directory? archive_dir
-      FileUtils.mkpath archive_dir
-      puts "Created #{archive_dir}"
-    end
+    create_dir archive_dir
 
     if File.directory? site_dir
       archive = Dir.entries(archive_dir).sort_by(&:to_i).last.to_i + 1
@@ -177,14 +173,13 @@ SHELL
   end
 
   def write_resource
-    FileUtils.mkpath site_dir
-    puts "Created #{site_dir}"
+    create_dir site_dir
 
     name = ''
+    contents = []
     template_group = ''
     template_type = ''
     php_template = ''
-    contents = []
     re = RE[resource.to_sym]
 
     input.each_line do |line|
@@ -224,13 +219,17 @@ SHELL
     resource == 'templates'
   end
 
+  def write_file(name, contents, template_group, template_type, php_template)
+      file = file_path_for name, template_group, template_type, php_template
+      open(file, 'w') { |f| f.write(contents.join) }
+      puts "Created #{file} (#{contents.length} bytes)"
+  end
+
   def file_path_for(name, template_group, template_type, php_template)
     dir = template_group.length > 0 ? "#{site_dir}/#{template_group}" : site_dir
-    unless File.directory? dir
-      FileUtils.mkpath dir
-      puts "Created #{dir}"
-    end
+    create_dir dir
     ext = file_extension_for template_type, php_template
+
     "#{dir}/#{name}.#{ext}"
   end
 
@@ -249,10 +248,11 @@ SHELL
     end
   end
 
-  def write_file(name, contents, template_group, template_type, php_template)
-      file = file_path_for name, template_group, template_type, php_template
-      open(file, 'w') { |f| f.write(contents.join) }
-      puts "Created #{file} (#{contents.length} bytes)"
+  def create_dir(dir)
+    unless File.directory? dir
+      FileUtils.mkpath dir
+      puts "Created #{dir}"
+    end
   end
 
   def dump_input
