@@ -8,77 +8,75 @@
 #
 # HOW: Create a script. For example:
 # 
-#   #
 #   # Require this file.
-#   #
-#
 #   require '~/lib/syncee.rb'
 #
-#   #
 #   # Details of one or more EE sites accessible via SSH.
-#   #
+#
+#   # Required parameters:
+#   #   ssh_host    -- DNS name, IP address or "Host" entry in ~/.ssh/config
+#   #   db_name     -- Name of MySQL database
+#   #   db_user     -- User of db_name
+#   #   db_password -- Password of db_user
+#
+#   # Optional parameters:
+#   #   ssh_user -- Login user of ssh_host (default: none)
+#   #   ssh_port -- Port of ssh_host (default: 22)
+#   #   db_host  -- Host name or IP address of db_name (default: localhost)
+#   #   site_id  -- ExpressionEngine Site ID (default: 1)
 #
 #   sites = {
 #
 #     en: {
-#       host: 'example.com',
-#       os_user: 'user',
-#       db_name: 'db',
-#       db_user: 'user',
-#       db_password: 'pass',
-#       site_id: '1',
-#       site_name: 'default_site',
+#       ssh_host: 'example.com',
+#       db_name: 'ee',
+#       db_user: 'alice',
+#       db_password: 'secret',
 #     },
 #
 #     es: {
-#       host: 'example.com',
-#       os_user: 'user',
-#       db_name: 'db',
-#       db_user: 'user',
-#       db_password: 'pass',
+#       ssh_host: 'example.com',
+#       db_name: 'ee',
+#       db_user: 'alice',
+#       db_password: 'secret',
 #       site_id: '2',
-#       site_name: 'es',
 #     },
 #
 #   }
 #   
-#   #
 #   # Menu to provide syncing from a choice of multiple sites.
-#   #
 #   # Be sure to include an 'a' (or similar) to abort.
-#   #
 #
 #   case SyncEE.prompt_user("Example.com (e)ENGLISH (s)PANISH (a)BORT", /e|s|a/)
+#   when 'e'
+#     SyncEE.new sites[:en]
 #
-#     when 'e'
-#       SyncEE.new sites[:en]
-#
-#     when 's'
-#       SyncEE.new sites[:es]
-#
+#   when 's'
+#     SyncEE.new sites[:es]
 #   end
 
 require 'fileutils' # mkpath, mv
 require 'io/console' # STDIN.getch
 
 class SyncEE
-  SITE_KEYS = %w(host os_user db_name db_user db_password site_id site_name)
+  REQUIRED_SITE_KEYS = %w(ssh_host db_name db_user db_password)
 
   SQL = {
+    site_name: 'SELECT site_name FROM exp_sites WHERE site_id = %d',
     snippets: 'SELECT snippet_name, snippet_contents FROM exp_snippets WHERE site_id = %d',
     templates: 'SELECT g.group_name, t.template_name, t.template_type, t.allow_php, t.template_data FROM exp_templates t INNER JOIN exp_template_groups g USING (group_id) WHERE t.site_id = %d',
     variables: 'SELECT variable_name, variable_data FROM exp_global_variables WHERE site_id = %d'
   }
 
   RE = {
+    row: /^\*{10,} \d+\. row \*{10,}$/,
+
     snippets: {
-      row: /^\*{10,} \d+\. row \*{10,}$/,
       name: /^\W*snippet_name: (\w+)$/,
       data: /^\W*snippet_contents: (.+)$/,
     },
 
     templates: {
-      row: /^\*{10,} \d+\. row \*{10,}$/,
       name: /^\W*template_name: (\w+)$/,
       template_group: /^\W*group_name: (\w+)$/,
       template_type: /^\W*template_type: (\w+)$/,
@@ -87,15 +85,12 @@ class SyncEE
     },
 
     variables: {
-      row: /^\*{10,} \d+\. row \*{10,}$/,
       name: /^\W*variable_name: (\w+)$/,
       data: /^\W*variable_data: (.+)$/,
     }
   }
 
-  MYSQL_OPTIONS = '--batch --raw --vertical'
-
-  attr_accessor :site, :resource, :base_dir, :site_dir, :input, :debug
+  attr_accessor :site, :site_name, :resource, :base_dir, :site_dir, :input, :debug
 
   def self.prompt_user(message, regex)
     response = nil
@@ -116,19 +111,56 @@ class SyncEE
     @debug = debug
 
     unless valid_site?
-      puts "Here are the required arguments:\n\t#{SITE_KEYS.join(', ')}\nAnd here is what you gave me:\n\t#{site.inspect}"
+      puts "Here are the required arguments:\n\t#{REQUIRED_SITE_KEYS.join(', ')}\nAnd here is what you gave me:\n\t#{site.inspect}"
       exit 1
     end
 
-    sync 'snippets'
-    sync 'templates'
-    sync 'variables'
+    read_site_name
+
+    sync :snippets
+    sync :templates
+    sync :variables
   end
 
   private
 
   def valid_site?
-    SITE_KEYS.all?{ |key| site.keys.include?(key.to_sym) && !site[key.to_sym].empty? }
+    REQUIRED_SITE_KEYS.all?{ |key| site.keys.include?(key.to_sym) && !site[key.to_sym].empty? }
+  end
+
+  def read_site_name
+    site_id = site.keys.include?(:site_id) ? site[:site_id] : 1
+    sql = SQL[:site_name] % site_id
+
+    shell_command = <<SHELL
+ssh #{ssh_params} 'mysql --execute="#{sql}" --skip-column-names #{mysql_params}'
+SHELL
+
+    puts "Running #{shell_command}" if debug
+    @site_name = `#{shell_command}`.strip
+
+    if $?.success?
+      puts "site name: #{site_name}"
+      true
+
+    else
+      puts "Command failed: #{shell_command}"
+      exit 1 
+
+    end
+  end
+
+  def ssh_params
+    ssh_user = site.keys.include?(:ssh_user) ? "-l #{site[:ssh_user]}" : ''
+    ssh_port = site.keys.include?(:ssh_port) ? "-p #{site[:ssh_port]}" : ''
+
+    "#{ssh_user} #{ssh_port} #{site[:ssh_host]}"
+  end
+
+  def mysql_params
+    db_host = site.keys.include?(:db_host) ? site[:db_host] : 'localhost'
+
+    "--host=#{db_host} --user=#{site[:db_user]} --password=#{site[:db_password]} #{site[:db_name]}"
   end
 
   def sync(resource)
@@ -142,18 +174,18 @@ class SyncEE
     end
 
     @base_dir = "#{Dir.pwd}/ee/#{resource}"
-    @site_dir = "#{base_dir}/#{site[:site_name]}"
+    @site_dir = "#{base_dir}/#{site_name}"
 
     archive_existing_resource
     write_resource
   end
 
   def read_resource
-    sql = SQL[resource.to_sym] % site[:site_id]
-    credentials = "--user=#{site[:db_user]} --password=#{site[:db_password]}"
+    site_id = site.keys.include?(:site_id) ? site[:site_id] : 1
+    sql = SQL[resource] % site_id
 
     shell_command = <<SHELL
-ssh #{site[:os_user]}@#{site[:host]} 'mysql --execute="#{sql}" #{credentials} #{MYSQL_OPTIONS} #{site[:db_name]}'
+ssh #{ssh_params} 'mysql --batch --execute="#{sql}" --raw --vertical #{mysql_params}'
 SHELL
 
     puts "Running #{shell_command}" if debug
@@ -174,7 +206,7 @@ SHELL
   def archive_existing_resource
     return unless File.directory? site_dir
 
-    archive_dir = "#{base_dir}/archive/#{site[:site_name]}"
+    archive_dir = "#{base_dir}/archive/#{site_name}"
     ensure_dir archive_dir
 
     # archive sub-dirs are ascending postive integers
@@ -187,8 +219,6 @@ SHELL
   def write_resource
     ensure_dir site_dir
 
-    pattern = RE[resource.to_sym]
-
     name = ''
     contents = []
     template_group = ''
@@ -199,7 +229,7 @@ SHELL
       # prevent: invalid byte sequence in utf-8
       line.force_encoding('ISO-8859-1').encode('UTF-8', 'binary', invalid: :replace, undef: :replace, replace: '')
 
-      if line.match(pattern[:row])
+      if line.match(RE[:row])
         if !name.empty? && !contents.empty?
           write_file name, contents, template_group, template_type, php_template
         end
@@ -210,19 +240,19 @@ SHELL
         template_type = ''
         php_template = ''
 
-      elsif match = line.match(pattern[:name])
+      elsif match = line.match(RE[resource][:name])
         name = match[1]
 
-      elsif templates? && match = line.match(pattern[:template_group])
+      elsif templates? && match = line.match(RE[resource][:template_group])
         template_group = match[1]
 
-      elsif templates? && match = line.match(pattern[:template_type])
+      elsif templates? && match = line.match(RE[resource][:template_type])
         template_type = match[1]
 
-      elsif templates? && match = line.match(pattern[:php_template])
+      elsif templates? && match = line.match(RE[resource][:php_template])
         php_template = match[1]
 
-      elsif match = line.match(pattern[:data])
+      elsif match = line.match(RE[resource][:data])
         contents << match[1]
         contents << "\n" # not included in match()
 
@@ -238,7 +268,7 @@ SHELL
   end
 
   def templates?
-    resource == 'templates'
+    resource == :templates
   end
 
   def write_file(name, contents, template_group, template_type, php_template)
@@ -281,7 +311,7 @@ SHELL
   end
 
   def dump_input
-    path = "#{site[:site_name]}-#{resource}.txt"
+    path = "#{site_name}-#{resource}.txt"
     open(path, 'w') { |f| f.write(input) }
 
     puts "Wrote #{input.length} bytes to #{path}"
