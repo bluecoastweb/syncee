@@ -116,7 +116,8 @@ class SyncEE
     @debug = debug
 
     unless valid_site?
-      raise RuntimeError, "#{SITE_KEYS.join(', ')} are all required"
+      puts "Here are the required arguments:\n\t#{SITE_KEYS.join(', ')}\nAnd here is what you gave me:\n\t#{site.inspect}"
+      exit 1
     end
 
     sync 'snippets'
