@@ -93,7 +93,7 @@ class SyncEE
 
   MYSQL_OPTIONS = '--batch --raw --vertical'
 
-  attr_accessor :site, :resource, :input, :base_dir, :site_dir, :debug
+  attr_accessor :site, :resource, :base_dir, :site_dir, :input, :debug
 
   def self.prompt_user(message, regex)
     response = nil
@@ -127,7 +127,7 @@ class SyncEE
   def sync(resource)
     @resource = resource
 
-    return unless get
+    return unless read_resource
 
     if input.empty?
       puts "No #{resource} found"
@@ -137,11 +137,11 @@ class SyncEE
     @base_dir = "#{Dir.pwd}/ee/#{resource}"
     @site_dir = "#{base_dir}/#{site[:site_name]}"
 
-    archive_existing
-    write
+    archive_existing_resource
+    write_resource
   end
 
-  def get
+  def read_resource
     sql = SQL[resource.to_sym] % site[:site_id]
     credentials = "--user=#{site[:db_user]} --password=#{site[:db_password]}"
     shell_command = <<SHELL
@@ -161,7 +161,7 @@ SHELL
     end
   end
 
-  def archive_existing
+  def archive_existing_resource
     archive_dir = "#{base_dir}/archive/#{site[:site_name]}"
 
     unless File.directory? archive_dir
@@ -176,7 +176,7 @@ SHELL
     end
   end
 
-  def write
+  def write_resource
     FileUtils.mkpath site_dir
     puts "Created #{site_dir}"
 
@@ -192,9 +192,7 @@ SHELL
       line.force_encoding('ISO-8859-1').encode('UTF-8', 'binary', invalid: :replace, undef: :replace, replace: '')
       if line.match(re[:row])
         if !name.empty? && !contents.empty?
-          file = file_path_for template_group, name, template_type, php_template
-          open(file, 'w') { |f| f.write(contents.join) }
-          puts "Created #{file} (#{contents.length} bytes)"
+          write_file name, contents, template_group, template_type, php_template
         end
         name = ''
         template_group = ''
@@ -218,14 +216,22 @@ SHELL
     end
 
     if !name.empty? && !contents.empty?
-      file = file_path_for template_group, name, template_type, php_template
-      open(file, 'w') { |f| f.write(contents.join) }
-      puts "Created #{file} (#{contents.length} bytes)"
+      write_file name, contents, template_group, template_type, php_template
     end
   end
 
   def templates?
     resource == 'templates'
+  end
+
+  def file_path_for(name, template_group, template_type, php_template)
+    dir = template_group.length > 0 ? "#{site_dir}/#{template_group}" : site_dir
+    unless File.directory? dir
+      FileUtils.mkpath dir
+      puts "Created #{dir}"
+    end
+    ext = file_extension_for template_type, php_template
+    "#{dir}/#{name}.#{ext}"
   end
 
   def file_extension_for(template_type, php_template)
@@ -243,14 +249,10 @@ SHELL
     end
   end
 
-  def file_path_for(template_group, name, template_type, php_template)
-    dir = template_group.length > 0 ? "#{site_dir}/#{template_group}" : site_dir
-    unless File.directory? dir
-      FileUtils.mkpath dir
-      puts "Created #{dir}"
-    end
-    ext = file_extension_for template_type, php_template
-    "#{dir}/#{name}.#{ext}"
+  def write_file(name, contents, template_group, template_type, php_template)
+      file = file_path_for name, template_group, template_type, php_template
+      open(file, 'w') { |f| f.write(contents.join) }
+      puts "Created #{file} (#{contents.length} bytes)"
   end
 
   def dump_input
