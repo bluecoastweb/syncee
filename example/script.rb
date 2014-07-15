@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-require 'syncee.rb'
+require './lib/syncee.rb'
 
 sites = {
   en: {
