@@ -76,6 +76,7 @@ class SyncEE
       name: /^\W*snippet_name: (\w+)$/,
       data: /^\W*snippet_contents: (.+)$/,
     },
+
     templates: {
       row: /^\*{10,} \d+\. row \*{10,}$/,
       name: /^\W*template_name: (\w+)$/,
@@ -84,6 +85,7 @@ class SyncEE
       php_template: /^\W*allow_php: (\w+)$/,
       data: /^\W*template_data: (.+)$/,
     },
+
     variables: {
       row: /^\*{10,} \d+\. row \*{10,}$/,
       name: /^\W*variable_name: (\w+)$/,
@@ -97,13 +99,15 @@ class SyncEE
 
   def self.prompt_user(message, regex)
     response = nil
+
     while response !~ regex
       STDIN.flush
-      print "\n" unless response.nil? # not the first time
+      puts unless response.nil? # not the first time
       print "#{message} > "
       response = STDIN.getch
     end
     puts
+
     response
   end
 
@@ -144,6 +148,7 @@ class SyncEE
   def read_resource
     sql = SQL[resource.to_sym] % site[:site_id]
     credentials = "--user=#{site[:db_user]} --password=#{site[:db_password]}"
+
     shell_command = <<SHELL
 ssh #{site[:os_user]}@#{site[:host]} 'mysql --execute="#{sql}" #{credentials} #{MYSQL_OPTIONS} #{site[:db_name]}'
 SHELL
