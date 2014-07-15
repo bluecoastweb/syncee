@@ -183,18 +183,19 @@ SHELL
   def write_resource
     create_dir site_dir
 
+    pattern = RE[resource.to_sym]
+
     name = ''
     contents = []
     template_group = ''
     template_type = ''
     php_template = ''
-    re = RE[resource.to_sym]
 
     input.each_line do |line|
       # prevent: invalid byte sequence in utf-8
       line.force_encoding('ISO-8859-1').encode('UTF-8', 'binary', invalid: :replace, undef: :replace, replace: '')
 
-      if line.match(re[:row])
+      if line.match(pattern[:row])
         if !name.empty? && !contents.empty?
           write_file name, contents, template_group, template_type, php_template
         end
@@ -205,19 +206,19 @@ SHELL
         template_type = ''
         php_template = ''
 
-      elsif match = line.match(re[:name])
+      elsif match = line.match(pattern[:name])
         name = match[1]
 
-      elsif templates? && match = line.match(re[:template_group])
+      elsif templates? && match = line.match(pattern[:template_group])
         template_group = match[1]
 
-      elsif templates? && match = line.match(re[:template_type])
+      elsif templates? && match = line.match(pattern[:template_type])
         template_type = match[1]
 
-      elsif templates? && match = line.match(re[:php_template])
+      elsif templates? && match = line.match(pattern[:php_template])
         php_template = match[1]
 
-      elsif match = line.match(re[:data])
+      elsif match = line.match(pattern[:data])
         contents << match[1]
         contents << "\n" # not included in match()
 
@@ -276,9 +277,9 @@ SHELL
   end
 
   def dump_input
-    dump = "#{site[:site_name]}-#{resource}.txt"
-    open(dump, 'w') { |f| f.write(input) }
+    path = "#{site[:site_name]}-#{resource}.txt"
+    open(path, 'w') { |f| f.write(input) }
 
-    puts "Wrote #{input.length} bytes to #{dump}"
+    puts "Wrote #{input.length} bytes to #{path}"
   end
 end
