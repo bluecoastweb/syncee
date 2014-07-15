@@ -169,15 +169,16 @@ SHELL
   end
 
   def archive_existing_resource
+    return unless File.directory? site_dir
+
     archive_dir = "#{base_dir}/archive/#{site[:site_name]}"
     create_dir archive_dir
 
-    if File.directory? site_dir
-      archive = Dir.entries(archive_dir).sort_by(&:to_i).last.to_i + 1
-      FileUtils.mv site_dir, "#{archive_dir}/#{archive}"
+    # archive sub-dirs are ascending postive integers
+    sub_dir = Dir.entries(archive_dir).sort_by(&:to_i).last.to_i + 1
+    FileUtils.mv site_dir, "#{archive_dir}/#{sub_dir}"
 
-      puts "Moved #{site_dir} to #{archive_dir}/#{archive}"
-    end
+    puts "Moved #{site_dir} to #{archive_dir}/#{sub_dir}"
   end
 
   def write_resource
