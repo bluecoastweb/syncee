@@ -115,7 +115,9 @@ class SyncEE
     @site = site
     @debug = debug
 
-    raise RuntimeError, "#{SITE_KEYS.join(', ')} are all required" unless valid_site?
+    unless valid_site?
+      raise RuntimeError, "#{SITE_KEYS.join(', ')} are all required"
+    end
 
     sync 'snippets'
     sync 'templates'
@@ -125,7 +127,7 @@ class SyncEE
   private
 
   def valid_site?
-    SITE_KEYS.all?{ |key| !site[key.to_sym].empty? rescue false }
+    SITE_KEYS.all?{ |key| site.keys.include?(key.to_sym) && !site[key.to_sym].empty? }
   end
 
   def sync(resource)
