@@ -155,9 +155,11 @@ SHELL
       puts "Found #{input.length} bytes of #{resource}"
       dump_input if debug
       true
+
     else
       puts "Command failed: #{shell_command}"
       false
+
     end
   end
 
@@ -168,6 +170,7 @@ SHELL
     if File.directory? site_dir
       archive = Dir.entries(archive_dir).sort_by(&:to_i).last.to_i + 1
       FileUtils.mv site_dir, "#{archive_dir}/#{archive}"
+
       puts "Moved #{site_dir} to #{archive_dir}/#{archive}"
     end
   end
@@ -183,30 +186,39 @@ SHELL
     re = RE[resource.to_sym]
 
     input.each_line do |line|
-      # invalid byte sequence in utf-8
+      # prevent: invalid byte sequence in utf-8
       line.force_encoding('ISO-8859-1').encode('UTF-8', 'binary', invalid: :replace, undef: :replace, replace: '')
+
       if line.match(re[:row])
         if !name.empty? && !contents.empty?
           write_file name, contents, template_group, template_type, php_template
         end
+
         name = ''
+        contents = []
         template_group = ''
         template_type = ''
         php_template = ''
-        contents = []
+
       elsif match = line.match(re[:name])
         name = match[1]
+
       elsif templates? && match = line.match(re[:template_group])
         template_group = match[1]
+
       elsif templates? && match = line.match(re[:template_type])
         template_type = match[1]
+
       elsif templates? && match = line.match(re[:php_template])
         php_template = match[1]
+
       elsif match = line.match(re[:data])
         contents << match[1]
         contents << "\n" # not included in match()
+
       else
         contents << line
+
       end
     end
 
@@ -220,37 +232,40 @@ SHELL
   end
 
   def write_file(name, contents, template_group, template_type, php_template)
-      file = file_path_for name, template_group, template_type, php_template
-      open(file, 'w') { |f| f.write(contents.join) }
-      puts "Created #{file} (#{contents.length} bytes)"
+      dir = dir_for template_group
+      ext = file_ext_for template_type, php_template
+
+      path = "#{dir}/#{name}.#{ext}"
+      open(path, 'w') { |f| f.write(contents.join) }
+
+      puts "Created #{path} (#{contents.length} bytes)"
   end
 
-  def file_path_for(name, template_group, template_type, php_template)
+  def dir_for(template_group)
     dir = template_group.length > 0 ? "#{site_dir}/#{template_group}" : site_dir
     create_dir dir
-    ext = file_extension_for template_type, php_template
 
-    "#{dir}/#{name}.#{ext}"
+    dir
   end
 
-  def file_extension_for(template_type, php_template)
+  def file_ext_for(template_type, php_template)
     case template_type
-    when 'css'
-      'css'
-    when 'js'
-      'js'
-    when 'xml'
-      'xml'
+    when 'css', 'js', 'xml'
+      template_type
+
     when 'webpage'
       php_template == 'y' ? 'php' : 'html'
+
     else
       'html'
+
     end
   end
 
   def create_dir(dir)
     unless File.directory? dir
       FileUtils.mkpath dir
+
       puts "Created #{dir}"
     end
   end
@@ -258,6 +273,7 @@ SHELL
   def dump_input
     dump = "#{site[:site_name]}-#{resource}.txt"
     open(dump, 'w') { |f| f.write(input) }
+
     puts "Wrote #{input.length} bytes to #{dump}"
   end
 end
