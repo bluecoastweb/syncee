@@ -80,16 +80,22 @@ class SyncEE
 
   # Example:
   #
-  #   SyncEE.prompt_user("(e)ENGLISH (s)PANISH (a)BORT" /e|s|a/)
+  #   SyncEE.prompt_user(
+  #     "(e)ENGLISH (s)PANISH (a)BORT",
+  #     /e|s|a/
+  #   )
   #
-  # NB be sure to include an 'a' or similar to abort.
+  # NB be sure to include an otherwise unused letter to abort.
   #
-  def self.prompt_user(prompt, regex)
+  def self.prompt_user(prompt, response_regex)
     response = nil
 
-    while response !~ regex
+    while response !~ response_regex
       STDIN.flush
-      puts unless response.nil? # not the first time
+      unless response.nil?
+        # invalid response, so repeat prompt on new line
+        puts
+      end
       print "#{prompt} > "
       response = STDIN.getch
     end
@@ -141,12 +147,8 @@ class SyncEE
   end
 
   def read_site_name
-    site_id = site.keys.include?(:site_id) ? site[:site_id] : 1
-    sql = SQL[:site_name] % site_id
-
-    shell_command = <<SHELL
-ssh #{ssh_params} 'mysql --execute="#{sql}" --skip-column-names #{mysql_params}'
-SHELL
+    sql = get_sql :site_name
+    shell_command = get_shell_command sql, '--skip-column-names'
 
     puts "Running #{shell_command}" if debug
     @input = `#{shell_command}`
@@ -159,6 +161,15 @@ SHELL
       false
 
     end
+  end
+
+  def get_sql(key)
+    site_id = site.keys.include?(:site_id) ? site[:site_id] : 1
+    SQL[key] % site_id
+  end
+
+  def get_shell_command(sql, extra_mysql_params)
+    %(ssh #{ssh_params} 'mysql --execute="#{sql}" #{extra_mysql_params} #{mysql_params}')
   end
 
   def ssh_params
@@ -192,12 +203,8 @@ SHELL
   end
 
   def read_resource
-    site_id = site.keys.include?(:site_id) ? site[:site_id] : 1
-    sql = SQL[resource] % site_id
-
-    shell_command = <<SHELL
-ssh #{ssh_params} 'mysql --batch --execute="#{sql}" --raw --vertical #{mysql_params}'
-SHELL
+    sql = get_sql resource
+    shell_command = get_shell_command sql, '--batch --raw --vertical'
 
     puts "Running #{shell_command}" if debug
     @input = `#{shell_command}`
