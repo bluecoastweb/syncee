@@ -248,9 +248,7 @@ class SyncEE
       line.force_encoding('ISO-8859-1').encode('UTF-8', 'binary', invalid: :replace, undef: :replace, replace: '')
 
       if line.match(INPUT[:row])
-        if !name.empty? && !data.empty?
-          write_file name, data, template_group, template_type, php_template
-        end
+        conditionally_write_file name, data, template_group, template_type, php_template
 
         name = ''
         data = []
@@ -280,16 +278,16 @@ class SyncEE
       end
     end
 
-    if !name.empty? && !data.empty?
-      write_file name, data, template_group, template_type, php_template
-    end
+    conditionally_write_file name, data, template_group, template_type, php_template
   end
 
   def templates?
     resource == :templates
   end
 
-  def write_file(name, data, template_group, template_type, php_template)
+  def conditionally_write_file(name, data, template_group, template_type, php_template)
+      return if name.empty? || data.empty?
+
       dir = dir_for template_group
       ext = ext_for template_type, php_template
 
