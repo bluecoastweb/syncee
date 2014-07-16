@@ -23,6 +23,7 @@ sites = {
     db_name: 'ee',
     db_user: 'bob',
     db_password: 'secret',
+#   site_id: '1',
   },
 
   es: {
