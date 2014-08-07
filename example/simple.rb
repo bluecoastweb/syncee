@@ -9,8 +9,8 @@ require './lib/syncee.rb'
 #   db_password -- Password of db_user
 
 # Optional parameters:
-#   ssh_user -- Login user of ssh_host (default: none)
-#   ssh_port -- Port of ssh_host (default: 22)
+#   ssh_user -- Login user of ssh_host (default: system $USER or "User" in SSH config)
+#   ssh_port -- Port of ssh_host (default: 22 or "Port" in SSH config)
 #   db_host  -- Host name or IP address of db_name (default: localhost)
 #   site_id  -- ExpressionEngine Site ID (default: 1)
 
