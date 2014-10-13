@@ -54,25 +54,27 @@ class SyncEE
     variables: 'SELECT variable_name, variable_data FROM exp_global_variables WHERE site_id = %d'
   }
 
+  # template/snippet/variable names can contain '-'
+  # template/snippet/variable data can be empty
   INPUT = {
     row: /^\*{10,} \d+\. row \*{10,}$/,
 
     templates: {
-      name: /^\W*template_name: (\w+)$/,
-      template_group: /^\W*group_name: (\w+)$/,
+      name: /^\W*template_name: (.+)$/,        # (\w+)
+      template_group: /^\W*group_name: (.+)$/, # (\w+)
       template_type: /^\W*template_type: (\w+)$/,
       php_template: /^\W*allow_php: (\w+)$/,
-      data: /^\W*template_data: (.+)$/,
+      data: /^\W*template_data: (.*)$/,        # (.+)
     },
 
     snippets: {
-      name: /^\W*snippet_name: (\w+)$/,
-      data: /^\W*snippet_contents: (.+)$/,
+      name: /^\W*snippet_name: (.+)$/,     # (\w+)
+      data: /^\W*snippet_contents: (.*)$/, # (.+)
     },
 
     variables: {
-      name: /^\W*variable_name: (\w+)$/,
-      data: /^\W*variable_data: (.+)$/,
+      name: /^\W*variable_name: (.+)$/, # (\w+)
+      data: /^\W*variable_data: (.*)$/, # (.+)
     }
   }
 
@@ -113,8 +115,8 @@ class SyncEE
   #
   # Optional site keys:
   #
-  #   ssh_user -- Login user of ssh_host (default: system $USER or "User" in SSH config)
-  #   ssh_port -- Port of ssh_host (default: 22 or "Port" in SSH config)
+  #   ssh_user -- Login user of ssh_host (default: none)
+  #   ssh_port -- Port of ssh_host (default: 22)
   #   db_host  -- Host name or IP address of db_name (default: localhost)
   #   site_id  -- ExpressionEngine Site ID (default: 1)
   #
@@ -182,7 +184,7 @@ class SyncEE
   def mysql_params
     db_host = site.keys.include?(:db_host) ? site[:db_host] : 'localhost'
 
-    "--host=#{db_host} --user=#{site[:db_user]} --password=#{site[:db_password]} #{site[:db_name]}"
+    %(--host=#{db_host} --user=#{site[:db_user]} --password="#{site[:db_password]}" #{site[:db_name]})
   end
 
   def sync(resource)
